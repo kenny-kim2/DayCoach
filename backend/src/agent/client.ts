@@ -1,16 +1,20 @@
-import OpenAI from "openai";
+import { CopilotClient } from "@github/copilot-sdk";
 
-const AZURE_API_KEY = process.env.AZURE_OPENAI_API_KEY ?? "";
-const AZURE_ENDPOINT = process.env.AZURE_OPENAI_ENDPOINT ?? "";
-const AZURE_DEPLOYMENT = process.env.AZURE_OPENAI_DEPLOYMENT ?? "gpt-4o";
+let _client: CopilotClient | null = null;
 
-export function createAzureClient(): OpenAI {
-  return new OpenAI({
-    apiKey: AZURE_API_KEY,
-    baseURL: `${AZURE_ENDPOINT}/openai/deployments/${AZURE_DEPLOYMENT}`,
-    defaultQuery: { "api-version": "2024-02-15-preview" },
-    defaultHeaders: { "api-key": AZURE_API_KEY },
-  });
+export async function getCopilotClient(): Promise<CopilotClient> {
+  if (!_client) {
+    _client = new CopilotClient({
+      ...(process.env.GITHUB_TOKEN ? { githubToken: process.env.GITHUB_TOKEN } : {}),
+    });
+    await _client.start();
+  }
+  return _client;
 }
 
-export { AZURE_DEPLOYMENT };
+export async function stopCopilotClient(): Promise<void> {
+  if (_client) {
+    await _client.stop();
+    _client = null;
+  }
+}
