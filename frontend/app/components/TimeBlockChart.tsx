@@ -64,13 +64,11 @@ export default function TimeBlockChart({ timeBlocks, startHour = 9, startMinute 
 
   const displayBlocks = buildDisplayBlocks(timeBlocks);
   const totalMins = timeBlocks.reduce((sum, b) => sum + b.durationMinutes, 0);
-  // 자유 시간 포함 전체 블록 기준 최대 길이 계산
-  const maxWidth = Math.max(
-    ...displayBlocks.map((b) =>
-      b.type === "task" ? b.block.durationMinutes : b.durationMinutes
-    ),
-    1
-  );
+
+  // 태스크 블록만 기준으로 최대값 계산 — 자유 시간이 스케일을 왜곡하지 않도록
+  const taskMaxWidth = Math.max(...timeBlocks.map((b) => b.durationMinutes), 1);
+  // 자유 시간 바의 최대 너비는 50%로 고정 (태스크 블록보다 시각적으로 작게)
+  const FREE_TIME_MAX_PCT = 50;
 
   return (
     <motion.div
@@ -89,7 +87,11 @@ export default function TimeBlockChart({ timeBlocks, startHour = 9, startMinute 
       <div className="space-y-3 overflow-hidden">
         {displayBlocks.map((item, i) => {
           if (item.type === "free") {
-            const widthPct = Math.min(Math.max((item.durationMinutes / maxWidth) * 100, 10), 100);
+            // 자유 시간: 최대 FREE_TIME_MAX_PCT(50%)로 캡 — task 블록보다 항상 작게
+            const widthPct = Math.min(
+              Math.max((item.durationMinutes / taskMaxWidth) * 100, 15),
+              FREE_TIME_MAX_PCT
+            );
             return (
               <motion.div
                 key={`free-${i}`}
@@ -106,18 +108,17 @@ export default function TimeBlockChart({ timeBlocks, startHour = 9, startMinute 
                     className="bg-gray-100 border border-dashed border-gray-300 rounded-full h-7 flex items-center px-3"
                     style={{ width: `${widthPct}%`, minWidth: "80px", maxWidth: "100%" }}
                   >
-                    <span className="text-gray-400 text-xs truncate">✨ 자유 시간</span>
+                    <span className="text-gray-400 text-xs truncate">✨ 자유 시간 · {formatDuration(item.durationMinutes)}</span>
                   </div>
                 </div>
-                <span className="text-xs text-gray-300 w-10">
-                  {formatDuration(item.durationMinutes)}
-                </span>
+                <span className="w-10" /> {/* 자유 시간은 바 안에 시간 표시 */}
               </motion.div>
             );
           }
 
           const { block, colorIndex } = item;
-          const widthPct = Math.min(Math.max((block.durationMinutes / maxWidth) * 100, 10), 100);
+          // 태스크: taskMaxWidth 기준 100% 풀 스케일
+          const widthPct = Math.min(Math.max((block.durationMinutes / taskMaxWidth) * 100, 10), 100);
           const color = COLORS[colorIndex % COLORS.length];
 
           return (
