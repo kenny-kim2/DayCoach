@@ -188,7 +188,7 @@ router.post("/analyze", async (req: Request, res: Response) => {
 
     await session.sendAndWait({
       prompt: `사용 가능한 시간: ${availableHours}시간.\n\n분석할 항목 (${preParsedItems.length}개):\n${preParsedItems.map((t, i) => `${i + 1}. ${t}`).join("\n")}\n\nparse_tasks → prioritize_tasks → build_day_plan 순서로 도구를 호출하세요.`,
-    });
+    }, 300000); // 5분 타임아웃
 
     sendSSE(res, { type: "done" });
     res.end();
