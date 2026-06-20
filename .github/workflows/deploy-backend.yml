@@ -36,10 +36,14 @@ jobs:
       - name: Deploy to Azure App Service
         run: |
           cd backend
-          zip -r ../backend-deploy.zip . -x "node_modules/*" -x "src/*" -x "*.ts"
+          # Install production-only deps inside backend for deployment zip
+          npm ci --omit=dev
+          # Bundle: dist/ + node_modules/ + package.json
+          zip -r ../backend-deploy.zip dist node_modules package.json
           cd ..
           az webapp deploy \
             --name daycoach-api \
             --resource-group daycoach-rg \
             --src-path backend-deploy.zip \
-            --type zip
+            --type zip \
+            --async false
