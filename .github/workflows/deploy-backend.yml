@@ -10,6 +10,10 @@ on:
       - '.github/workflows/deploy-backend.yml'
   workflow_dispatch:
 
+concurrency:
+  group: backend-deploy
+  cancel-in-progress: true
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -24,39 +28,47 @@ jobs:
           cache: 'npm'
           cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        run: npm ci --workspace=backend
-
-      - name: Build
-        run: npm run build:backend
+      - name: Install & Build
+        run: |
+          npm ci --workspace=backend
+          npm run build:backend
 
       - name: Login to Azure
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Deploy to Azure App Service
+      - name: Package & Deploy
         run: |
-          mkdir -p deploy-staging
-          cp -r backend/dist deploy-staging/dist
-          # Create deployment package.json: no build script, correct start script
-          node -e "
-            const pkg = require('./backend/package.json');
-            const deploy = {
-              name: pkg.name,
-              version: pkg.version,
-              type: pkg.type,
-              scripts: { start: 'node dist/backend/src/index.js', build: 'echo skip' },
-              dependencies: pkg.dependencies
-            };
-            require('fs').writeFileSync('deploy-staging/package.json', JSON.stringify(deploy, null, 2));
-          "
-          cd deploy-staging
-          zip -r ../backend-deploy.zip .
+          mkdir -p staging
+          cp -r backend/dist staging/dist
+          cp backend/package.json staging/package.json
+          cd staging
+          npm install --omit=dev --no-audit --no-fund
+
+          # @github/copilot 안의 바이너리/IDE 전용 파일 제거 (서버 불필요)
+          rm -rf node_modules/@github/copilot/prebuilds
+          rm -rf node_modules/@github/copilot/mxc-bin
+          rm -rf node_modules/@github/copilot/tgrep
+          rm -rf node_modules/@github/copilot/ripgrep
+          rm -rf node_modules/@github/copilot/pvrecorder
+          rm -rf node_modules/@github/copilot/clipboard
+          rm -rf node_modules/@github/copilot-darwin-arm64
+          rm -rf node_modules/@github/copilot-linux-x64
+          rm -rf node_modules/@esbuild
+          rm -rf node_modules/typescript
+
+          echo "Size after cleanup:"
+          du -sh node_modules
+
+          zip -r ../backend-deploy.zip dist node_modules package.json
+          echo "Zip size: $(du -sh ../backend-deploy.zip | cut -f1)"
           cd ..
+
           az webapp deploy \
             --name daycoach-api \
             --resource-group daycoach-rg \
             --src-path backend-deploy.zip \
             --type zip \
             --async true
+          echo "✅ Deploy initiated"
