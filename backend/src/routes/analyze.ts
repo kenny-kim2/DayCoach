@@ -43,19 +43,19 @@ router.post("/analyze", async (req: Request, res: Response) => {
       onPermissionRequest: approveAll,
       tools: [
         defineTool("parse_tasks", {
-          description: "Extract individual tasks from the user s free-form text input",
+          description: "Decompose the user's input into specific, actionable subtasks. Break down complex or vague tasks into concrete steps (each completable in 15–90 min). Simple single-step tasks can remain as-is.",
           parameters: {
             type: "object",
             properties: {
               tasks: {
                 type: "array",
-                description: "List of extracted tasks",
+                description: "List of decomposed actionable subtasks",
                 items: {
                   type: "object",
                   properties: {
                     id: { type: "string", description: "Unique task ID (uuid)" },
-                    title: { type: "string", description: "Short task title" },
-                    rawText: { type: "string", description: "Original raw text for this task" },
+                    title: { type: "string", description: "Concrete, action-verb-led subtask title (e.g. '보고서 목차 잡기')" },
+                    rawText: { type: "string", description: "The original input text this subtask was derived from" },
                   },
                   required: ["id", "title", "rawText"],
                 },
