@@ -1,0 +1,57 @@
+commit 486d88c62a2a061e27cf6526c6a0236d5e627249
+Author: kenny-kim2 <kyunghyun96@naver.com>
+Date:   Sat Jun 20 15:25:36 2026 +0900
+
+    fix: strip IDE binaries from deploy zip (~600MB → ~30MB)
+    
+    @github/copilot has ripgrep, tree-sitter, voice engine, prebuilt
+    binaries for IDE use only. Strip them before zipping for Azure.
+    Also remove @esbuild and typescript (devDependencies not needed).
+    
+    Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+diff --git a/.github/workflows/deploy-backend.yml b/.github/workflows/deploy-backend.yml
+index 02f0ca2..ea72be7 100644
+--- a/.github/workflows/deploy-backend.yml
++++ b/.github/workflows/deploy-backend.yml
+@@ -10,7 +10,6 @@ on:
+       - '.github/workflows/deploy-backend.yml'
+   workflow_dispatch:
+ 
+-# 동시 배포 방지 - 기존 실행 취소하고 새 배포 진행
+ concurrency:
+   group: backend-deploy
+   cancel-in-progress: true
+@@ -41,14 +40,31 @@ jobs:
+ 
+       - name: Package & Deploy
+         run: |
+-          # staging: dist + prod node_modules + package.json
+           mkdir -p staging
+           cp -r backend/dist staging/dist
+           cp backend/package.json staging/package.json
+           cd staging
+           npm install --omit=dev --no-audit --no-fund
++
++          # @github/copilot 안의 바이너리/IDE 전용 파일 제거 (서버 불필요)
++          rm -rf node_modules/@github/copilot/prebuilds
++          rm -rf node_modules/@github/copilot/mxc-bin
++          rm -rf node_modules/@github/copilot/tgrep
++          rm -rf node_modules/@github/copilot/ripgrep
++          rm -rf node_modules/@github/copilot/pvrecorder
++          rm -rf node_modules/@github/copilot/clipboard
++          rm -rf node_modules/@github/copilot-darwin-arm64
++          rm -rf node_modules/@github/copilot-linux-x64
++          rm -rf node_modules/@esbuild
++          rm -rf node_modules/typescript
++
++          echo "Size after cleanup:"
++          du -sh node_modules
++
+           zip -r ../backend-deploy.zip dist node_modules package.json
++          echo "Zip size: $(du -sh ../backend-deploy.zip | cut -f1)"
+           cd ..
++
+           az webapp deploy \
+             --name daycoach-api \
+             --resource-group daycoach-rg \

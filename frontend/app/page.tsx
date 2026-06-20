@@ -7,7 +7,7 @@ import LoadingScreen from "@/app/components/LoadingScreen";
 import ResultScreen from "@/app/components/ResultScreen";
 
 export default function Home() {
-  const { state, analyze, reset } = useAnalysis();
+  const { state, analyze, reset, cancel } = useAnalysis();
 
   const showInput = state.step === "idle" || state.step === "error";
   const showLoading = state.step === "parsing" || state.step === "prioritizing" || state.step === "planning";
@@ -29,6 +29,7 @@ export default function Home() {
             key="loading"
             step={state.step}
             parsedTasks={state.parsedTasks}
+            onCancel={cancel}
           />
         )}
 

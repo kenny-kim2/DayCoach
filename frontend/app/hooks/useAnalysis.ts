@@ -26,6 +26,11 @@ export function useAnalysis() {
 
   const abortRef = useRef<AbortController | null>(null);
 
+  const cancel = useCallback(() => {
+    abortRef.current?.abort();
+    setState({ step: "idle", parsedTasks: [], prioritizedTasks: [], dayPlan: null, error: null, startHour: new Date().getHours(), startMinute: new Date().getMinutes() });
+  }, []);
+
   const analyze = useCallback(async (input: string, availableHours: number = 8) => {
     if (abortRef.current) {
       abortRef.current.abort();
@@ -113,5 +118,5 @@ export function useAnalysis() {
     setState({ step: "idle", parsedTasks: [], prioritizedTasks: [], dayPlan: null, error: null, startHour: new Date().getHours(), startMinute: new Date().getMinutes() });
   }, []);
 
-  return { state, analyze, reset };
+  return { state, analyze, reset, cancel };
 }

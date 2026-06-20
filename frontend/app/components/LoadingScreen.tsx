@@ -6,6 +6,7 @@ import type { Task, AnalysisStep } from "@/app/lib/types";
 interface LoadingScreenProps {
   step: AnalysisStep;
   parsedTasks: Task[];
+  onCancel?: () => void;
 }
 
 const stepMessages: Record<string, string> = {
@@ -14,7 +15,7 @@ const stepMessages: Record<string, string> = {
   planning: "📅 하루 계획 완성 중...",
 };
 
-export default function LoadingScreen({ step, parsedTasks }: LoadingScreenProps) {
+export default function LoadingScreen({ step, parsedTasks, onCancel }: LoadingScreenProps) {
   const message = stepMessages[step] || "분석 중...";
 
   return (
@@ -81,6 +82,15 @@ export default function LoadingScreen({ step, parsedTasks }: LoadingScreenProps)
               />
             ))}
           </div>
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              className="mt-4 w-full py-2 text-sm text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+              aria-label="분석 취소"
+            >
+              ✕ 취소
+            </button>
+          )}
         </div>
       </div>
     </motion.div>

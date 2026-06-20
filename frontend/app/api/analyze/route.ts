@@ -8,8 +8,18 @@ function encode(data: object): string {
   return `data: ${JSON.stringify(data)}\n\n`;
 }
 
-// Mock API route for development/demo when backend is unavailable
+// Mock API route — development only
+// In production NEXT_PUBLIC_API_URL must point to the real backend
 export async function POST(request: Request) {
+  if (process.env.NODE_ENV === "production") {
+    return Response.json(
+      {
+        error: "backend_required",
+        message: "백엔드 서버에 연결이 필요합니다. NEXT_PUBLIC_API_URL 환경변수를 설정해주세요.",
+      },
+      { status: 503 }
+    );
+  }
   const body = await request.json().catch(() => ({}));
   const input: string = body.input || "";
   const availableHours: number = body.availableHours ?? 8;
