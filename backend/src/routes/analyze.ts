@@ -36,6 +36,9 @@ router.post("/analyze", async (req: Request, res: Response) => {
     // 자유형식 텍스트를 개별 할 일 항목으로 사전 분리
     const preParsedItems = preParseInput(body.input);
 
+    // 단계별 결과 공유 (핸들러 간 교차 참조용)
+    let sharedPrioritizedTasks: PrioritizedTask[] = [];
+
     session = await client.createSession({
       ...(process.env.COPILOT_MODEL ? { model: process.env.COPILOT_MODEL } : {}),
       systemMessage: {
@@ -112,7 +115,7 @@ router.post("/analyze", async (req: Request, res: Response) => {
               const n = Number(v);
               return isNaN(n) || n <= 0 ? fallback : n;
             };
-            const prioritizedTasks: PrioritizedTask[] = tasks.map((t) => ({
+            sharedPrioritizedTasks = tasks.map((t) => ({
               ...t,
               id: t.id || uuidv4(),
               priority: VALID_PRIORITY.includes(t.priority as typeof VALID_PRIORITY[number]) ? t.priority : "medium",
@@ -120,8 +123,8 @@ router.post("/analyze", async (req: Request, res: Response) => {
               urgency: VALID_URGENCY.includes(t.urgency as typeof VALID_URGENCY[number]) ? t.urgency : "today",
               estimatedMinutes: toNum(t.estimatedMinutes, 30),
             }));
-            sendSSE(res, { type: "tasks_prioritized", tasks: prioritizedTasks });
-            return { success: true, count: prioritizedTasks.length };
+            sendSSE(res, { type: "tasks_prioritized", tasks: sharedPrioritizedTasks });
+            return { success: true, count: sharedPrioritizedTasks.length };
           },
         }),
         defineTool("build_day_plan", {
@@ -170,8 +173,8 @@ router.post("/analyze", async (req: Request, res: Response) => {
           handler: async (args) => {
             const a = args as {
               firstAction: DayPlan["firstAction"];
-              todayTasks: PrioritizedTask[];
-              deferredTasks: PrioritizedTask[];
+              todayTasks: { id: string; title?: string }[];
+              deferredTasks: { id: string; title?: string }[];
               timeBlocks: DayPlan["timeBlocks"];
               totalEstimatedMinutes: number;
               motivationalMessage: string;
@@ -180,10 +183,23 @@ router.post("/analyze", async (req: Request, res: Response) => {
               const n = Number(v);
               return isNaN(n) ? fallback : n;
             };
+            // task ID로 sharedPrioritizedTasks에서 전체 데이터 교차 참조
+            const byId = new Map(sharedPrioritizedTasks.map((t: PrioritizedTask) => [t.id, t]));
+            const resolveTask = (t: { id: string; title?: string }): PrioritizedTask =>
+              byId.get(t.id) ?? {
+                id: t.id,
+                title: t.title ?? t.id,
+                rawText: t.title ?? "",
+                priority: "medium",
+                estimatedMinutes: 30,
+                category: "other",
+                urgency: "today",
+                reason: "",
+              };
             const plan: DayPlan = {
               firstAction: a.firstAction,
-              todayTasks: a.todayTasks ?? [],
-              deferredTasks: a.deferredTasks ?? [],
+              todayTasks: (a.todayTasks ?? []).map(resolveTask),
+              deferredTasks: (a.deferredTasks ?? []).map(resolveTask),
               timeBlocks: (a.timeBlocks ?? []).map((b) => ({
                 ...b,
                 startOffset: toNum(b.startOffset, 0),

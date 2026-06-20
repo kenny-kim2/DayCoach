@@ -12,10 +12,11 @@ interface ResultScreenProps {
 }
 
 function formatMinutes(mins: number): string {
-  if (mins < 60) return `${mins}분`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m > 0 ? `${h}시간 ${m}분` : `${h}시간`;
+  const m = isNaN(mins) || mins <= 0 ? 0 : Math.round(mins);
+  if (m < 60) return `${m}분`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem > 0 ? `${h}시간 ${rem}분` : `${h}시간`;
 }
 
 export default function ResultScreen({ plan, onReset }: ResultScreenProps) {
