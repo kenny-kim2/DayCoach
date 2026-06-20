@@ -28,10 +28,11 @@ jobs:
           cache: 'npm'
           cache-dependency-path: package-lock.json
 
-      - name: Install & Build
-        run: |
-          npm ci --workspace=backend
-          npm run build:backend
+      - name: Install dependencies
+        run: npm ci --workspace=backend
+
+      - name: Typecheck
+        run: npm run typecheck --workspace=backend
 
       - name: Login to Azure
         uses: azure/login@v2
@@ -40,18 +41,31 @@ jobs:
 
       - name: Package & Deploy
         run: |
-          mkdir -p staging
-          cp -r backend/dist staging/dist
-          # type=commonjs 필수: 컴파일 결과가 CJS인데 원본은 "type":"module"
+          # tsx로 TypeScript 소스 직접 실행 (컴파일 불필요, ESM/CJS 자동 처리)
+          mkdir -p staging/backend staging/shared
+
+          # TypeScript 소스 복사 (dist 아닌 src)
+          cp -r backend/src staging/backend/src
+          cp -r shared staging/shared
+
+          # 배포용 package.json 생성 (type=module, tsx로 실행)
           node -e "
-            const p = require('./backend/package.json');
-            const deploy = { name: p.name, version: p.version, type: 'commonjs', scripts: { start: p.scripts.start }, dependencies: p.dependencies };
-            require('fs').writeFileSync('staging/package.json', JSON.stringify(deploy, null, 2));
+            const fs = require('fs');
+            const p = JSON.parse(fs.readFileSync('./backend/package.json', 'utf8'));
+            const deploy = {
+              name: p.name,
+              version: p.version,
+              type: 'module',
+              scripts: { start: 'tsx backend/src/index.ts' },
+              dependencies: p.dependencies
+            };
+            fs.writeFileSync('staging/package.json', JSON.stringify(deploy, null, 2));
           "
+
           cd staging
           npm install --omit=dev --no-audit --no-fund
 
-          # @github/copilot 안의 바이너리/IDE 전용 파일 제거 (서버 불필요)
+          # 불필요한 플랫폼 바이너리 제거 (linux-x64는 유지!)
           rm -rf node_modules/@github/copilot/prebuilds
           rm -rf node_modules/@github/copilot/mxc-bin
           rm -rf node_modules/@github/copilot/tgrep
@@ -59,14 +73,19 @@ jobs:
           rm -rf node_modules/@github/copilot/pvrecorder
           rm -rf node_modules/@github/copilot/clipboard
           rm -rf node_modules/@github/copilot-darwin-arm64
-          rm -rf node_modules/@github/copilot-linux-x64
-          rm -rf node_modules/@esbuild
+          rm -rf node_modules/@github/copilot-darwin-x64
+          rm -rf node_modules/@github/copilot-win32-x64
+          rm -rf node_modules/@github/copilot-win32-arm64
+          rm -rf node_modules/@github/copilot-linuxmusl-x64
+          rm -rf node_modules/@github/copilot-linuxmusl-arm64
+          rm -rf node_modules/@github/copilot-linux-arm64
           rm -rf node_modules/typescript
+          rm -rf node_modules/@esbuild
 
           echo "Size after cleanup:"
           du -sh node_modules
 
-          zip -r ../backend-deploy.zip dist node_modules package.json
+          zip -r ../backend-deploy.zip backend shared node_modules package.json
           echo "Zip size: $(du -sh ../backend-deploy.zip | cut -f1)"
           cd ..
 
