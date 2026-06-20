@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { defineTool, approveAll } from "@github/copilot-sdk";
 import { v4 as uuidv4 } from "uuid";
 import { getCopilotClient } from "../agent/client";
-import { buildSystemPrompt } from "../agent/prompts";
+import { buildSystemPrompt, preParseInput } from "../agent/prompts";
 import { AnalyzeRequest, SSEEvent, Task, PrioritizedTask, DayPlan } from "../../../shared/src/types";
 
 const router = Router();
@@ -33,11 +33,14 @@ router.post("/analyze", async (req: Request, res: Response) => {
   try {
     const client = await getCopilotClient();
 
+    // 자유형식 텍스트를 개별 할 일 항목으로 사전 분리
+    const preParsedItems = preParseInput(body.input);
+
     session = await client.createSession({
       ...(process.env.COPILOT_MODEL ? { model: process.env.COPILOT_MODEL } : {}),
       systemMessage: {
         mode: "replace",
-        content: buildSystemPrompt(body.input),
+        content: buildSystemPrompt(body.input, preParsedItems),
       },
       infiniteSessions: { enabled: false },
       onPermissionRequest: approveAll,
@@ -175,7 +178,7 @@ router.post("/analyze", async (req: Request, res: Response) => {
     });
 
     await session.sendAndWait({
-      prompt: `사용 가능한 시간: ${availableHours}시간. 위 입력을 분석해서 parse_tasks → prioritize_tasks → build_day_plan 순서로 도구를 호출하세요.`,
+      prompt: `사용 가능한 시간: ${availableHours}시간.\n\n분석할 항목 (${preParsedItems.length}개):\n${preParsedItems.map((t, i) => `${i + 1}. ${t}`).join("\n")}\n\nparse_tasks → prioritize_tasks → build_day_plan 순서로 도구를 호출하세요.`,
     });
 
     sendSSE(res, { type: "done" });
