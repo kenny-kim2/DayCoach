@@ -64,7 +64,13 @@ export default function TimeBlockChart({ timeBlocks, startHour = 9, startMinute 
 
   const displayBlocks = buildDisplayBlocks(timeBlocks);
   const totalMins = timeBlocks.reduce((sum, b) => sum + b.durationMinutes, 0);
-  const maxWidth = Math.max(...timeBlocks.map((b) => b.durationMinutes), 1);
+  // 자유 시간 포함 전체 블록 기준 최대 길이 계산
+  const maxWidth = Math.max(
+    ...displayBlocks.map((b) =>
+      b.type === "task" ? b.block.durationMinutes : b.durationMinutes
+    ),
+    1
+  );
 
   return (
     <motion.div
@@ -80,10 +86,10 @@ export default function TimeBlockChart({ timeBlocks, startHour = 9, startMinute 
         </span>
       </h3>
 
-      <div className="space-y-3">
+      <div className="space-y-3 overflow-hidden">
         {displayBlocks.map((item, i) => {
           if (item.type === "free") {
-            const widthPct = Math.max((item.durationMinutes / maxWidth) * 100, 10);
+            const widthPct = Math.min(Math.max((item.durationMinutes / maxWidth) * 100, 10), 100);
             return (
               <motion.div
                 key={`free-${i}`}
@@ -95,10 +101,10 @@ export default function TimeBlockChart({ timeBlocks, startHour = 9, startMinute 
                 <span className="text-xs text-gray-400 w-12 text-right font-mono">
                   {formatTime(startHour, startMinute, item.startOffset)}
                 </span>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <div
                     className="bg-gray-100 border border-dashed border-gray-300 rounded-full h-7 flex items-center px-3"
-                    style={{ width: `${widthPct}%`, minWidth: "80px" }}
+                    style={{ width: `${widthPct}%`, minWidth: "80px", maxWidth: "100%" }}
                   >
                     <span className="text-gray-400 text-xs truncate">✨ 자유 시간</span>
                   </div>
@@ -111,7 +117,7 @@ export default function TimeBlockChart({ timeBlocks, startHour = 9, startMinute 
           }
 
           const { block, colorIndex } = item;
-          const widthPct = Math.max((block.durationMinutes / maxWidth) * 100, 10);
+          const widthPct = Math.min(Math.max((block.durationMinutes / maxWidth) * 100, 10), 100);
           const color = COLORS[colorIndex % COLORS.length];
 
           return (
@@ -125,10 +131,10 @@ export default function TimeBlockChart({ timeBlocks, startHour = 9, startMinute 
               <span className="text-xs text-gray-500 w-12 text-right font-mono">
                 {formatTime(startHour, startMinute, block.startOffset)}
               </span>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <div
                   className={`${color} rounded-full h-7 flex items-center px-3 transition-all duration-500`}
-                  style={{ width: `${widthPct}%`, minWidth: "80px" }}
+                  style={{ width: `${widthPct}%`, minWidth: "80px", maxWidth: "100%" }}
                 >
                   <span className="text-white text-xs font-medium truncate">
                     {block.taskTitle}
