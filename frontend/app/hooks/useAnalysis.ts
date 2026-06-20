@@ -9,6 +9,8 @@ export interface AnalysisState {
   prioritizedTasks: PrioritizedTask[];
   dayPlan: DayPlan | null;
   error: string | null;
+  startHour: number;
+  startMinute: number;
 }
 
 export function useAnalysis() {
@@ -18,6 +20,8 @@ export function useAnalysis() {
     prioritizedTasks: [],
     dayPlan: null,
     error: null,
+    startHour: new Date().getHours(),
+    startMinute: new Date().getMinutes(),
   });
 
   const abortRef = useRef<AbortController | null>(null);
@@ -28,12 +32,18 @@ export function useAnalysis() {
     }
     abortRef.current = new AbortController();
 
+    const now = new Date();
+    const startHour = now.getHours();
+    const startMinute = now.getMinutes();
+
     setState({
       step: "parsing",
       parsedTasks: [],
       prioritizedTasks: [],
       dayPlan: null,
       error: null,
+      startHour,
+      startMinute,
     });
 
     try {
@@ -41,7 +51,7 @@ export function useAnalysis() {
       const response = await fetch(`${apiUrl}/api/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input, availableHours }),
+        body: JSON.stringify({ input, availableHours, currentHour: startHour, currentMinute: startMinute }),
         signal: abortRef.current.signal,
       });
 
@@ -100,7 +110,7 @@ export function useAnalysis() {
 
   const reset = useCallback(() => {
     abortRef.current?.abort();
-    setState({ step: "idle", parsedTasks: [], prioritizedTasks: [], dayPlan: null, error: null });
+    setState({ step: "idle", parsedTasks: [], prioritizedTasks: [], dayPlan: null, error: null, startHour: new Date().getHours(), startMinute: new Date().getMinutes() });
   }, []);
 
   return { state, analyze, reset };

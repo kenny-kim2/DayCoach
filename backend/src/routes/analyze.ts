@@ -20,6 +20,8 @@ router.post("/analyze", async (req: Request, res: Response) => {
   }
 
   const availableHours = body.availableHours ?? 8;
+  const currentHour = (body as { currentHour?: number }).currentHour ?? new Date().getHours();
+  const currentMinute = (body as { currentMinute?: number }).currentMinute ?? new Date().getMinutes();
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -43,7 +45,7 @@ router.post("/analyze", async (req: Request, res: Response) => {
       ...(process.env.COPILOT_MODEL ? { model: process.env.COPILOT_MODEL } : {}),
       systemMessage: {
         mode: "replace",
-        content: buildSystemPrompt(body.input, preParsedItems),
+        content: buildSystemPrompt(body.input, preParsedItems, currentHour, currentMinute, availableHours),
       },
       infiniteSessions: { enabled: false },
       onPermissionRequest: approveAll,

@@ -37,6 +37,8 @@ export default function Home() {
             key="result"
             plan={state.dayPlan!}
             onReset={reset}
+            startHour={state.startHour}
+            startMinute={state.startMinute}
           />
         )}
       </AnimatePresence>

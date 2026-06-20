@@ -9,6 +9,8 @@ import TimeBlockChart from "./TimeBlockChart";
 interface ResultScreenProps {
   plan: DayPlan;
   onReset: () => void;
+  startHour?: number;
+  startMinute?: number;
 }
 
 function formatMinutes(mins: number): string {
@@ -19,7 +21,7 @@ function formatMinutes(mins: number): string {
   return rem > 0 ? `${h}시간 ${rem}분` : `${h}시간`;
 }
 
-export default function ResultScreen({ plan, onReset }: ResultScreenProps) {
+export default function ResultScreen({ plan, onReset, startHour = 9, startMinute = 0 }: ResultScreenProps) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -63,7 +65,7 @@ export default function ResultScreen({ plan, onReset }: ResultScreenProps) {
       )}
 
       {/* Time Blocks */}
-      <TimeBlockChart timeBlocks={plan.timeBlocks} />
+      <TimeBlockChart timeBlocks={plan.timeBlocks} startHour={startHour} startMinute={startMinute} />
 
       {/* Deferred Tasks */}
       {plan.deferredTasks.length > 0 && (

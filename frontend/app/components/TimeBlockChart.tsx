@@ -6,6 +6,7 @@ import type { TimeBlock } from "@/app/lib/types";
 interface TimeBlockChartProps {
   timeBlocks: TimeBlock[];
   startHour?: number;
+  startMinute?: number;
 }
 
 const COLORS = [
@@ -17,9 +18,9 @@ const COLORS = [
   "bg-teal-500",
 ];
 
-function formatTime(baseHour: number, offsetMins: number): string {
+function formatTime(baseHour: number, baseMinute: number, offsetMins: number): string {
   const safeOffset = isNaN(offsetMins) ? 0 : offsetMins;
-  const totalMins = baseHour * 60 + safeOffset;
+  const totalMins = baseHour * 60 + baseMinute + safeOffset;
   const h = Math.floor(totalMins / 60) % 24;
   const m = totalMins % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
@@ -33,7 +34,7 @@ function formatDuration(mins: number): string {
   return rem > 0 ? `${h}h ${rem}m` : `${h}h`;
 }
 
-export default function TimeBlockChart({ timeBlocks, startHour = 9 }: TimeBlockChartProps) {
+export default function TimeBlockChart({ timeBlocks, startHour = 9, startMinute = 0 }: TimeBlockChartProps) {
   if (!timeBlocks || timeBlocks.length === 0) return null;
 
   const totalMins = timeBlocks.reduce((sum, b) => sum + b.durationMinutes, 0);
@@ -67,7 +68,7 @@ export default function TimeBlockChart({ timeBlocks, startHour = 9 }: TimeBlockC
               className="flex items-center gap-3"
             >
               <span className="text-xs text-gray-500 w-12 text-right font-mono">
-                {formatTime(startHour, block.startOffset)}
+                {formatTime(startHour, startMinute, block.startOffset)}
               </span>
               <div className="flex-1">
                 <div

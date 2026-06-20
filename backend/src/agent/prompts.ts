@@ -22,10 +22,21 @@ export function preParseInput(raw: string): string[] {
   return items.length > 1 ? items : [normalized];
 }
 
-export function buildSystemPrompt(userInput: string, preParsedItems: string[]): string {
+export function buildSystemPrompt(
+  userInput: string,
+  preParsedItems: string[],
+  currentHour: number = 9,
+  currentMinute: number = 0,
+  availableHours: number = 8,
+): string {
   const itemList = preParsedItems.map((t, i) => `${i + 1}. ${t}`).join("\n");
+  const nowStr = `${String(currentHour).padStart(2, "0")}:${String(currentMinute).padStart(2, "0")}`;
+  const endHour = currentHour + availableHours;
+  const endStr = `${String(endHour % 24).padStart(2, "0")}:${String(currentMinute).padStart(2, "0")}`;
 
   return `You are DayCoach, a personal productivity AI assistant.
+
+Current time: ${nowStr} (available until approximately ${endStr}, ${availableHours} hours)
 
 The user's input has been pre-parsed into ${preParsedItems.length} task item(s):
 ${itemList}
@@ -44,7 +55,11 @@ Your job is to:
 
 2. Call prioritize_tasks to assign priority (high/medium/low), estimated duration (minutes), category (work/personal/health/admin/other), urgency (today/this-week/someday), and a one-sentence reason for each subtask.
 
-3. Call build_day_plan to create time blocks and identify the single most important first action the user should take RIGHT NOW.
+3. Call build_day_plan to create time blocks starting from NOW (${nowStr}).
+   - The first time block's startOffset MUST be 0 (= ${nowStr}).
+   - Each subsequent block's startOffset = previous block's startOffset + previous block's durationMinutes.
+   - Do NOT start from 09:00. Start from the current time ${nowStr}.
+   - Identify the single most important first action the user should take RIGHT NOW.
 
 Always provide reasoning for your prioritization.
 Be concise, practical, and encouraging.
