@@ -9,17 +9,12 @@ interface TimeBlockChartProps {
   startMinute?: number;
 }
 
-// 자유 시간으로 표시할 최소 간격 (분)
 const FREE_TIME_MIN_GAP = 10;
+const FREE_TIME_MAX_PCT = 50;
 
-const COLORS = [
-  "bg-blue-500",
-  "bg-indigo-500",
-  "bg-purple-500",
-  "bg-pink-500",
-  "bg-orange-500",
-  "bg-teal-500",
-];
+const COLORS = ["bg-blue-500","bg-indigo-500","bg-purple-500","bg-pink-500","bg-orange-500","bg-teal-500"];
+const COLOR_BORDERS = ["border-blue-400","border-indigo-400","border-purple-400","border-pink-400","border-orange-400","border-teal-400"];
+const COLOR_TEXT = ["text-blue-600","text-indigo-600","text-purple-600","text-pink-600","text-orange-600","text-teal-600"];
 
 function formatTime(baseHour: number, baseMinute: number, offsetMins: number): string {
   const safeOffset = isNaN(offsetMins) ? 0 : offsetMins;
@@ -41,13 +36,11 @@ type DisplayBlock =
   | { type: "task"; block: TimeBlock; colorIndex: number }
   | { type: "free"; startOffset: number; durationMinutes: number };
 
-/** 태스크 블록 사이의 빈 시간을 자유 시간 블록으로 채운다 */
 function buildDisplayBlocks(timeBlocks: TimeBlock[]): DisplayBlock[] {
   const sorted = [...timeBlocks].sort((a, b) => a.startOffset - b.startOffset);
   const result: DisplayBlock[] = [];
   let colorIdx = 0;
   let cursor = sorted[0]?.startOffset ?? 0;
-
   for (const block of sorted) {
     const gap = block.startOffset - cursor;
     if (gap >= FREE_TIME_MIN_GAP) {
@@ -64,11 +57,14 @@ export default function TimeBlockChart({ timeBlocks, startHour = 9, startMinute 
 
   const displayBlocks = buildDisplayBlocks(timeBlocks);
   const totalMins = timeBlocks.reduce((sum, b) => sum + b.durationMinutes, 0);
-
-  // 태스크 블록만 기준으로 최대값 계산 — 자유 시간이 스케일을 왜곡하지 않도록
   const taskMaxWidth = Math.max(...timeBlocks.map((b) => b.durationMinutes), 1);
-  // 자유 시간 바의 최대 너비는 50%로 고정 (태스크 블록보다 시각적으로 작게)
-  const FREE_TIME_MAX_PCT = 50;
+
+  const rawTextCount = new Map<string, number>();
+  for (const item of displayBlocks) {
+    if (item.type === "task" && item.block.rawText) {
+      rawTextCount.set(item.block.rawText, (rawTextCount.get(item.block.rawText) ?? 0) + 1);
+    }
+  }
 
   return (
     <motion.div
@@ -84,67 +80,76 @@ export default function TimeBlockChart({ timeBlocks, startHour = 9, startMinute 
         </span>
       </h3>
 
-      <div className="space-y-3 overflow-hidden">
+      <div className="space-y-1 overflow-hidden">
         {displayBlocks.map((item, i) => {
           if (item.type === "free") {
-            // 자유 시간: 최대 FREE_TIME_MAX_PCT(50%)로 캡 — task 블록보다 항상 작게
-            const widthPct = Math.min(
-              Math.max((item.durationMinutes / taskMaxWidth) * 100, 15),
-              FREE_TIME_MAX_PCT
-            );
+            const widthPct = Math.min(Math.max((item.durationMinutes / taskMaxWidth) * 100, 15), FREE_TIME_MAX_PCT);
             return (
               <motion.div
                 key={`free-${i}`}
-                initial={{ opacity: 0, x: -20 }}
+                initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1 + i * 0.07 }}
-                className="flex items-center gap-3"
+                transition={{ delay: 0.05 + i * 0.05 }}
+                className="flex items-center gap-3 py-1.5"
               >
-                <span className="text-xs text-gray-400 w-12 text-right font-mono">
+                <span className="text-xs text-gray-400 w-12 text-right font-mono shrink-0">
                   {formatTime(startHour, startMinute, item.startOffset)}
                 </span>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 flex items-center gap-2">
                   <div
-                    className="bg-gray-100 border border-dashed border-gray-300 rounded-full h-7 flex items-center px-3"
-                    style={{ width: `${widthPct}%`, minWidth: "80px", maxWidth: "100%" }}
-                  >
-                    <span className="text-gray-400 text-xs truncate">✨ 자유 시간 · {formatDuration(item.durationMinutes)}</span>
-                  </div>
+                    className="h-1.5 bg-gray-200 rounded-full shrink-0"
+                    style={{ width: `${widthPct}%`, maxWidth: "50%" }}
+                  />
+                  <span className="text-gray-400 text-xs whitespace-nowrap">
+                    ✨ 자유 시간 · {formatDuration(item.durationMinutes)}
+                  </span>
                 </div>
-                <span className="w-10" /> {/* 자유 시간은 바 안에 시간 표시 */}
               </motion.div>
             );
           }
 
           const { block, colorIndex } = item;
-          // 태스크: taskMaxWidth 기준 100% 풀 스케일
-          const widthPct = Math.min(Math.max((block.durationMinutes / taskMaxWidth) * 100, 10), 100);
+          const widthPct = Math.min(Math.max((block.durationMinutes / taskMaxWidth) * 100, 8), 100);
           const color = COLORS[colorIndex % COLORS.length];
+          const borderColor = COLOR_BORDERS[colorIndex % COLOR_BORDERS.length];
+          const textColor = COLOR_TEXT[colorIndex % COLOR_TEXT.length];
+          const isSplit = block.rawText ? (rawTextCount.get(block.rawText) ?? 0) > 1 : false;
 
           return (
             <motion.div
               key={block.taskId + i}
-              initial={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 + i * 0.07 }}
-              className="flex items-center gap-3"
+              transition={{ delay: 0.05 + i * 0.05 }}
+              className="flex gap-3 py-2"
             >
-              <span className="text-xs text-gray-500 w-12 text-right font-mono">
+              <span className="text-xs text-gray-500 w-12 text-right font-mono shrink-0 pt-0.5">
                 {formatTime(startHour, startMinute, block.startOffset)}
               </span>
               <div className="flex-1 min-w-0">
                 <div
-                  className={`${color} rounded-full h-7 flex items-center px-3 transition-all duration-500`}
-                  style={{ width: `${widthPct}%`, minWidth: "80px", maxWidth: "100%" }}
-                >
-                  <span className="text-white text-xs font-medium truncate">
+                  className={`${color} h-1.5 rounded-full mb-1.5`}
+                  style={{ width: `${widthPct}%`, maxWidth: "100%" }}
+                />
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className={`text-sm font-medium ${textColor}`}>
                     {block.taskTitle}
                   </span>
+                  {isSplit && (
+                    <span className={`text-[10px] border ${borderColor} ${textColor} rounded px-1 opacity-70`}>
+                      연속 작업
+                    </span>
+                  )}
+                  <span className="text-xs text-gray-400 ml-auto shrink-0">
+                    {formatDuration(block.durationMinutes)}
+                  </span>
                 </div>
+                {block.reason && (
+                  <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                    {block.reason}
+                  </p>
+                )}
               </div>
-              <span className="text-xs text-gray-400 w-10">
-                {formatDuration(block.durationMinutes)}
-              </span>
             </motion.div>
           );
         })}

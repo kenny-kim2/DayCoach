@@ -17,6 +17,8 @@ export interface TimeBlock {
   durationMinutes: number;
   taskId: string;
   taskTitle: string;
+  reason?: string;
+  rawText?: string;
 }
 
 export interface DayPlan {

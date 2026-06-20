@@ -202,11 +202,16 @@ router.post("/analyze", async (req: Request, res: Response) => {
               firstAction: a.firstAction,
               todayTasks: (a.todayTasks ?? []).map(resolveTask),
               deferredTasks: (a.deferredTasks ?? []).map(resolveTask),
-              timeBlocks: (a.timeBlocks ?? []).map((b) => ({
-                ...b,
-                startOffset: toNum(b.startOffset, 0),
-                durationMinutes: toNum(b.durationMinutes, 30),
-              })),
+              timeBlocks: (a.timeBlocks ?? []).map((b) => {
+                const matched = byId.get(b.taskId);
+                return {
+                  ...b,
+                  startOffset: toNum(b.startOffset, 0),
+                  durationMinutes: toNum(b.durationMinutes, 30),
+                  reason: matched?.reason ?? b.reason ?? "",
+                  rawText: matched?.rawText ?? b.rawText ?? "",
+                };
+              }),
               totalEstimatedMinutes: toNum(a.totalEstimatedMinutes, 0),
               motivationalMessage: a.motivationalMessage ?? "",
             };
