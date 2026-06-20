@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'backend/**'
+      - 'shared/**'
+      - 'package-lock.json'
       - '.github/workflows/deploy-backend.yml'
   workflow_dispatch:
 
@@ -35,15 +37,26 @@ jobs:
 
       - name: Deploy to Azure App Service
         run: |
-          cd backend
-          # Install production-only deps inside backend for deployment zip
-          npm ci --omit=dev
-          # Bundle: dist/ + node_modules/ + package.json
-          zip -r ../backend-deploy.zip dist node_modules package.json
+          mkdir -p deploy-staging
+          cp -r backend/dist deploy-staging/dist
+          # Create deployment package.json: no build script, correct start script
+          node -e "
+            const pkg = require('./backend/package.json');
+            const deploy = {
+              name: pkg.name,
+              version: pkg.version,
+              type: pkg.type,
+              scripts: { start: 'node dist/backend/src/index.js', build: 'echo skip' },
+              dependencies: pkg.dependencies
+            };
+            require('fs').writeFileSync('deploy-staging/package.json', JSON.stringify(deploy, null, 2));
+          "
+          cd deploy-staging
+          zip -r ../backend-deploy.zip .
           cd ..
           az webapp deploy \
             --name daycoach-api \
             --resource-group daycoach-rg \
             --src-path backend-deploy.zip \
             --type zip \
-            --async false
+            --async true
