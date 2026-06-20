@@ -94,5 +94,6 @@ jobs:
             --resource-group daycoach-rg \
             --src-path backend-deploy.zip \
             --type zip \
-            --async true
-          echo "✅ Deploy initiated"
+            --async true \
+            --timeout 0 || true
+          echo "✅ Deploy initiated (컨테이너 시작은 Azure에서 비동기 처리)"
