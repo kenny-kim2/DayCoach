@@ -42,7 +42,12 @@ jobs:
         run: |
           mkdir -p staging
           cp -r backend/dist staging/dist
-          cp backend/package.json staging/package.json
+          # type=commonjs 필수: 컴파일 결과가 CJS인데 원본은 "type":"module"
+          node -e "
+            const p = require('./backend/package.json');
+            const deploy = { name: p.name, version: p.version, type: 'commonjs', scripts: { start: p.scripts.start }, dependencies: p.dependencies };
+            require('fs').writeFileSync('staging/package.json', JSON.stringify(deploy, null, 2));
+          "
           cd staging
           npm install --omit=dev --no-audit --no-fund
 
