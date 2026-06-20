@@ -108,12 +108,17 @@ router.post("/analyze", async (req: Request, res: Response) => {
             const VALID_PRIORITY = ["high", "medium", "low"] as const;
             const VALID_CATEGORY = ["work", "personal", "health", "admin", "other"] as const;
             const VALID_URGENCY = ["today", "this-week", "someday"] as const;
+            const toNum = (v: unknown, fallback: number) => {
+              const n = Number(v);
+              return isNaN(n) || n <= 0 ? fallback : n;
+            };
             const prioritizedTasks: PrioritizedTask[] = tasks.map((t) => ({
               ...t,
               id: t.id || uuidv4(),
               priority: VALID_PRIORITY.includes(t.priority as typeof VALID_PRIORITY[number]) ? t.priority : "medium",
               category: VALID_CATEGORY.includes(t.category as typeof VALID_CATEGORY[number]) ? t.category : "other",
               urgency: VALID_URGENCY.includes(t.urgency as typeof VALID_URGENCY[number]) ? t.urgency : "today",
+              estimatedMinutes: toNum(t.estimatedMinutes, 30),
             }));
             sendSSE(res, { type: "tasks_prioritized", tasks: prioritizedTasks });
             return { success: true, count: prioritizedTasks.length };
@@ -171,12 +176,20 @@ router.post("/analyze", async (req: Request, res: Response) => {
               totalEstimatedMinutes: number;
               motivationalMessage: string;
             };
+            const toNum = (v: unknown, fallback: number) => {
+              const n = Number(v);
+              return isNaN(n) ? fallback : n;
+            };
             const plan: DayPlan = {
               firstAction: a.firstAction,
               todayTasks: a.todayTasks ?? [],
               deferredTasks: a.deferredTasks ?? [],
-              timeBlocks: a.timeBlocks ?? [],
-              totalEstimatedMinutes: a.totalEstimatedMinutes ?? 0,
+              timeBlocks: (a.timeBlocks ?? []).map((b) => ({
+                ...b,
+                startOffset: toNum(b.startOffset, 0),
+                durationMinutes: toNum(b.durationMinutes, 30),
+              })),
+              totalEstimatedMinutes: toNum(a.totalEstimatedMinutes, 0),
               motivationalMessage: a.motivationalMessage ?? "",
             };
             sendSSE(res, { type: "day_plan", plan });

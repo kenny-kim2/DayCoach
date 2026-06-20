@@ -18,17 +18,19 @@ const COLORS = [
 ];
 
 function formatTime(baseHour: number, offsetMins: number): string {
-  const totalMins = baseHour * 60 + offsetMins;
+  const safeOffset = isNaN(offsetMins) ? 0 : offsetMins;
+  const totalMins = baseHour * 60 + safeOffset;
   const h = Math.floor(totalMins / 60) % 24;
   const m = totalMins % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
 function formatDuration(mins: number): string {
-  if (mins < 60) return `${mins}분`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  const m = isNaN(mins) || mins <= 0 ? 0 : Math.round(mins);
+  if (m < 60) return `${m}분`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem > 0 ? `${h}h ${rem}m` : `${h}h`;
 }
 
 export default function TimeBlockChart({ timeBlocks, startHour = 9 }: TimeBlockChartProps) {
