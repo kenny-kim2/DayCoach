@@ -85,7 +85,11 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       const send = (data: object) => {
-        controller.enqueue(new TextEncoder().encode(encode(data)));
+        try {
+          controller.enqueue(new TextEncoder().encode(encode(data)));
+        } catch {
+          // client disconnected
+        }
       };
 
       await sleep(800);
@@ -100,7 +104,7 @@ export async function POST(request: Request) {
       await sleep(300);
       send({ type: "done" });
 
-      controller.close();
+      try { controller.close(); } catch { /* already closed */ }
     },
   });
 
