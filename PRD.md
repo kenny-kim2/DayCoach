@@ -94,19 +94,20 @@ DayCoach는 Copilot SDK 에이전트가 입력을 분석하여:
 ## 5. 기술 스택
 
 ```
-프론트엔드
-  └─ Next.js 14 (App Router) + React + TypeScript
-  └─ Tailwind CSS (반응형 UI)
-  └─ Framer Motion (카드 애니메이션)
-
-백엔드
-  └─ Next.js API Route (/api/analyze)
-  └─ @github/copilot-sdk (TypeScript SDK)
-  └─ Azure OpenAI (BYOK — gpt-4o)
-
-배포
-  └─ Azure App Service (Node.js 20)
-  └─ GitHub Actions CI/CD
+모노레포 (daycoach/)
+├── frontend/   → 프론트엔드 전담
+│   └─ Next.js 14 (App Router) + React + TypeScript
+│   └─ Tailwind CSS (반응형 UI)
+│   └─ Framer Motion (카드 애니메이션)
+│   └─ 배포: Azure Static Web Apps
+│
+├── backend/    → 백엔드 전담
+│   └─ Node.js + Express + TypeScript
+│   └─ @github/copilot-sdk (TypeScript SDK)
+│   └─ Azure OpenAI (BYOK — gpt-4o)
+│   └─ 배포: Azure App Service (Node.js 20)
+│
+└── shared/     → 공유 TypeScript 타입 (둘 다 import)
 ```
 
 ---
@@ -383,29 +384,46 @@ interface DayPlan {
 ### 아키텍처
 
 ```
-GitHub Repository
-       ↓ GitHub Actions CI/CD
-Azure App Service (Node.js 20)
-  └─ Next.js (프론트엔드 + API Route)
-  └─ 환경변수: AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT
+GitHub Repository (모노레포)
+   ├── frontend/ ──→ GitHub Actions ──→ Azure Static Web Apps
+   └── backend/  ──→ GitHub Actions ──→ Azure App Service
+                                              ↑
+                                    NEXT_PUBLIC_API_URL 환경변수로 연결
 ```
+
+### 배포 대상
+
+| 앱 | 서비스 | 이유 |
+|---|---|---|
+| `frontend/` | Azure Static Web Apps | Next.js SSR/SSG 지원, 무료 SSL, CDN |
+| `backend/` | Azure App Service (Node.js 20) | Express 서버 상시 실행, Copilot SDK |
 
 ### 환경 변수
 
+**backend/** (Azure App Service 환경변수)
+
 | 변수명 | 설명 |
 |---|---|
-| `AZURE_OPENAI_API_KEY` | Azure OpenAI API 키 (비밀 관리) |
+| `AZURE_OPENAI_API_KEY` | Azure OpenAI API 키 |
 | `AZURE_OPENAI_ENDPOINT` | Azure OpenAI 엔드포인트 URL |
-| `AZURE_OPENAI_DEPLOYMENT` | 배포 모델명 (예: `gpt-4o`) |
-| `COPILOT_SDK_VERSION` | 사용 SDK 버전 |
+| `AZURE_OPENAI_DEPLOYMENT` | 모델명 (예: `gpt-4o`) |
+| `CORS_ORIGIN` | 프론트엔드 URL (예: `https://daycoach.azurestaticapps.net`) |
+| `PORT` | 서버 포트 (기본: `3001`) |
+
+**frontend/** (Azure Static Web Apps 환경변수)
+
+| 변수명 | 설명 |
+|---|---|
+| `NEXT_PUBLIC_API_URL` | 백엔드 URL (예: `https://daycoach-api.azurewebsites.net`) |
 
 ### GitHub Actions 워크플로우
 
+**`.github/workflows/deploy-backend.yml`**
 ```yaml
-# .github/workflows/deploy.yml
 on:
   push:
     branches: [main]
+    paths: ['backend/**']
 
 jobs:
   deploy:
@@ -414,11 +432,36 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
-      - run: npm ci && npm run build
+      - run: cd backend && npm ci && npm run build
       - uses: azure/webapps-deploy@v3
         with:
-          app-name: daycoach
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          app-name: daycoach-api
+          publish-profile: ${{ secrets.AZURE_BACKEND_PUBLISH_PROFILE }}
+          package: backend
+```
+
+**`.github/workflows/deploy-frontend.yml`**
+```yaml
+on:
+  push:
+    branches: [main]
+    paths: ['frontend/**', 'shared/**']
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: cd frontend && npm ci && npm run build
+      - uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: frontend
+          output_location: .next
 ```
 
 ---
@@ -493,68 +536,87 @@ jobs:
 
 ### Phase 1: 기반 설정 (병렬 작업)
 
-| 백엔드 | 프론트엔드 |
+| 백엔드 (`backend/`) | 프론트엔드 (`frontend/`) |
 |---|---|
-| Next.js 프로젝트 초기화 | 동일 프로젝트에서 UI 작업 |
-| `@github/copilot-sdk` 설치 및 설정 | 입력 화면 (`InputForm` 컴포넌트) |
-| `/api/analyze` 엔드포인트 뼈대 | 로딩/스트리밍 화면 (`AnalyzingScreen`) |
-| Mock 응답으로 API 계약 검증 | Mock 데이터로 결과 카드 UI 구현 |
+| `npm init` + Express + TypeScript 설정 | Next.js 프로젝트 초기화 |
+| `@github/copilot-sdk` 설치 및 설정 | Tailwind CSS + Framer Motion 설정 |
+| `POST /api/analyze` 뼈대 + Mock 응답 | `shared/types.ts` import 설정 |
+| `.env.example` 작성 | Mock 데이터로 결과 카드 UI 구현 |
 
 ### Phase 2: 핵심 기능 구현
 
-| 백엔드 | 프론트엔드 |
+| 백엔드 (`backend/`) | 프론트엔드 (`frontend/`) |
 |---|---|
-| Copilot SDK 커스텀 도구 3개 구현 | SSE 스트리밍 수신 훅 (`useAnalysis`) |
-| Azure OpenAI BYOK 연결 | `PriorityCard` 컴포넌트 |
-| 스트리밍 응답 파이프라인 | `TimeBlock` 시각화 컴포넌트 |
-| 에러 처리 및 재시도 로직 | `FirstActionBanner` 강조 컴포넌트 |
+| Copilot SDK 커스텀 도구 3개 구현 | `useAnalysis` SSE 스트리밍 훅 |
+| Azure OpenAI BYOK 연결 | `InputForm` 컴포넌트 |
+| SSE 스트리밍 응답 파이프라인 | `PriorityCard` 컴포넌트 |
+| CORS 설정 (`CORS_ORIGIN` 환경변수) | `TimeBlockChart` 컴포넌트 |
+| 에러 처리 및 재시도 로직 | `FirstActionBanner` 컴포넌트 |
 
 ### Phase 3: 완성 및 배포
 
 | 작업 | 담당 |
 |---|---|
-| Azure App Service 설정 | 백엔드 |
-| 환경변수 보안 설정 | 백엔드 |
-| GitHub Actions 워크플로우 | 백엔드 |
+| Azure App Service 설정 (`backend/`) | 백엔드 |
+| Azure Static Web Apps 설정 (`frontend/`) | 프론트엔드 |
+| GitHub Actions 워크플로우 2개 작성 | 백엔드 |
+| `NEXT_PUBLIC_API_URL` 환경변수 연결 | 프론트엔드 |
 | 반응형 디자인 최종 조정 | 프론트엔드 |
 | 엔드투엔드 통합 테스트 | 공동 |
-| 배포 검증 | 공동 |
 
 ---
 
 ## 부록: 디렉토리 구조
 
 ```
-daycoach/
-├── src/
-│   ├── app/
-│   │   ├── page.tsx              # 메인 페이지 (입력 화면)
-│   │   ├── layout.tsx
-│   │   └── api/
-│   │       └── analyze/
-│   │           └── route.ts      # POST /api/analyze (Copilot SDK)
-│   ├── components/
-│   │   ├── InputForm.tsx         # 자유 입력 폼
-│   │   ├── AnalyzingScreen.tsx   # 스트리밍 로딩 화면
-│   │   ├── ResultScreen.tsx      # 결과 화면 컨테이너
-│   │   ├── FirstActionBanner.tsx # 첫 행동 강조 배너
-│   │   ├── PriorityCard.tsx      # 작업 카드 (우선순위 + 이유)
-│   │   └── TimeBlockChart.tsx    # 시간 블록 시각화
-│   ├── hooks/
-│   │   └── useAnalysis.ts        # SSE 스트리밍 훅
-│   ├── lib/
-│   │   ├── copilot-agent.ts      # Copilot SDK 에이전트 설정
-│   │   ├── tools/
-│   │   │   ├── parse-tasks.ts    # parse_tasks 도구
-│   │   │   ├── prioritize.ts     # prioritize_tasks 도구
-│   │   │   └── build-plan.ts     # build_day_plan 도구
-│   │   └── prompts.ts            # 시스템 프롬프트
-│   └── types/
-│       └── index.ts              # 공유 타입 정의
-├── .env.local                    # (gitignore) API 키
-├── .env.example                  # 환경변수 예시
-├── package.json
-└── README.md
+daycoach/                          ← 모노레포 루트
+│
+├── shared/                        ← 공유 TypeScript 타입 (둘 다 import)
+│   └── types.ts                   # Task, PrioritizedTask, DayPlan 등
+│
+├── frontend/                      ← 프론트엔드 전담 (Next.js)
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── page.tsx           # 메인 페이지
+│   │   │   └── layout.tsx
+│   │   ├── components/
+│   │   │   ├── InputForm.tsx      # 자유 입력 폼
+│   │   │   ├── AnalyzingScreen.tsx
+│   │   │   ├── ResultScreen.tsx
+│   │   │   ├── FirstActionBanner.tsx
+│   │   │   ├── PriorityCard.tsx
+│   │   │   └── TimeBlockChart.tsx
+│   │   └── hooks/
+│   │       └── useAnalysis.ts     # SSE 스트리밍 훅
+│   ├── next.config.ts
+│   ├── tailwind.config.ts
+│   └── package.json
+│
+├── backend/                       ← 백엔드 전담 (Express + Copilot SDK)
+│   ├── src/
+│   │   ├── routes/
+│   │   │   └── analyze.ts         # POST /api/analyze
+│   │   ├── lib/
+│   │   │   ├── agent.ts           # Copilot SDK 에이전트 설정
+│   │   │   └── tools/
+│   │   │       ├── parse-tasks.ts # parse_tasks 도구
+│   │   │       ├── prioritize.ts  # prioritize_tasks 도구
+│   │   │       └── build-plan.ts  # build_day_plan 도구
+│   │   └── index.ts               # Express 서버 진입점
+│   ├── .env.example
+│   └── package.json
+│
+├── .github/
+│   └── workflows/
+│       ├── deploy-frontend.yml    # → Azure Static Web Apps
+│       └── deploy-backend.yml     # → Azure App Service
+│
+└── PRD.md
+
+충돌 없는 이유:
+  프론트엔드 → frontend/ 만 수정
+  백엔드     → backend/ 만 수정
+  공유 타입  → shared/types.ts (둘 다 읽기만)
 ```
 
 ---
