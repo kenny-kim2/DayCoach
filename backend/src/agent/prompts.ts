@@ -139,6 +139,8 @@ ${itemList}
    - Place meals at their anchored times (see Meal Time Rules above) — use the correct startOffset to hit those times.
    - Schedule work/study tasks BEFORE leisure tasks in the timeline.
    - Leisure tasks should appear at the END of the day plan (evening).
+   - **CRITICAL: timeBlocks MUST include a block for EVERY task in todayTasks — no task should be missing from the timeline.**
+   - If a task was decomposed from the same original item (e.g., "빨래 세탁기 돌리기" and "빨래 건조/정리" both come from "빨래"), include BOTH in timeBlocks with correct startOffsets accounting for the waiting time between them.
    - Identify the single most important first action the user should take RIGHT NOW.
 
 Always provide reasoning for your prioritization.

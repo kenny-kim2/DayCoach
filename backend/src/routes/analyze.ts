@@ -198,20 +198,46 @@ router.post("/analyze", async (req: Request, res: Response) => {
                 urgency: "today",
                 reason: "",
               };
+            const todayTasks = (a.todayTasks ?? []).map(resolveTask);
+
+            // timeBlocks 생성 + enrichment
+            const rawTimeBlocks: DayPlan["timeBlocks"] = (a.timeBlocks ?? []).map((b) => {
+              const matched = byId.get(b.taskId);
+              return {
+                ...b,
+                startOffset: toNum(b.startOffset, 0),
+                durationMinutes: toNum(b.durationMinutes, 30),
+                reason: matched?.reason ?? b.reason ?? "",
+                rawText: matched?.rawText ?? b.rawText ?? "",
+              };
+            });
+
+            // todayTasks 중 timeBlocks에 없는 태스크를 자동 추가 (AI가 누락하는 경우 방어)
+            const blockTaskIds = new Set(rawTimeBlocks.map((b) => b.taskId));
+            const lastOffset = rawTimeBlocks.length > 0
+              ? Math.max(...rawTimeBlocks.map((b) => b.startOffset + b.durationMinutes))
+              : 0;
+            let nextOffset = lastOffset;
+            const missingBlocks: DayPlan["timeBlocks"] = todayTasks
+              .filter((t) => !blockTaskIds.has(t.id))
+              .map((t) => {
+                const block = {
+                  taskId: t.id,
+                  taskTitle: t.title,
+                  startOffset: nextOffset,
+                  durationMinutes: t.estimatedMinutes,
+                  reason: t.reason,
+                  rawText: t.rawText,
+                };
+                nextOffset += t.estimatedMinutes;
+                return block;
+              });
+
             const plan: DayPlan = {
               firstAction: a.firstAction,
-              todayTasks: (a.todayTasks ?? []).map(resolveTask),
+              todayTasks,
               deferredTasks: (a.deferredTasks ?? []).map(resolveTask),
-              timeBlocks: (a.timeBlocks ?? []).map((b) => {
-                const matched = byId.get(b.taskId);
-                return {
-                  ...b,
-                  startOffset: toNum(b.startOffset, 0),
-                  durationMinutes: toNum(b.durationMinutes, 30),
-                  reason: matched?.reason ?? b.reason ?? "",
-                  rawText: matched?.rawText ?? b.rawText ?? "",
-                };
-              }),
+              timeBlocks: [...rawTimeBlocks, ...missingBlocks],
               totalEstimatedMinutes: toNum(a.totalEstimatedMinutes, 0),
               motivationalMessage: a.motivationalMessage ?? "",
             };
