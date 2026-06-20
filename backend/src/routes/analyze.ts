@@ -105,7 +105,16 @@ router.post("/analyze", async (req: Request, res: Response) => {
           },
           handler: async (args) => {
             const { tasks } = args as { tasks: PrioritizedTask[] };
-            const prioritizedTasks: PrioritizedTask[] = tasks.map((t) => ({ ...t, id: t.id || uuidv4() }));
+            const VALID_PRIORITY = ["high", "medium", "low"] as const;
+            const VALID_CATEGORY = ["work", "personal", "health", "admin", "other"] as const;
+            const VALID_URGENCY = ["today", "this-week", "someday"] as const;
+            const prioritizedTasks: PrioritizedTask[] = tasks.map((t) => ({
+              ...t,
+              id: t.id || uuidv4(),
+              priority: VALID_PRIORITY.includes(t.priority as typeof VALID_PRIORITY[number]) ? t.priority : "medium",
+              category: VALID_CATEGORY.includes(t.category as typeof VALID_CATEGORY[number]) ? t.category : "other",
+              urgency: VALID_URGENCY.includes(t.urgency as typeof VALID_URGENCY[number]) ? t.urgency : "today",
+            }));
             sendSSE(res, { type: "tasks_prioritized", tasks: prioritizedTasks });
             return { success: true, count: prioritizedTasks.length };
           },

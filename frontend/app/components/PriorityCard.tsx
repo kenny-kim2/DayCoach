@@ -30,7 +30,7 @@ interface PriorityCardProps {
 }
 
 export default function PriorityCard({ task, index }: PriorityCardProps) {
-  const cfg = priorityConfig[task.priority];
+  const cfg = priorityConfig[task.priority as keyof typeof priorityConfig] ?? priorityConfig.medium;
 
   return (
     <motion.div
